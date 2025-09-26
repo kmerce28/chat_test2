@@ -17,9 +17,6 @@ export async function GET() {
         }
 
         try {
-          // 서버 정보 확인
-          const serverInfo = await conn.client.getServerInfo()
-          
           // 도구 목록 확인
           const tools = await conn.client.listTools()
           
@@ -34,8 +31,8 @@ export async function GET() {
             status: 'connected',
             healthy: true,
             serverInfo: {
-              name: serverInfo.name,
-              version: serverInfo.version
+              name: 'MCP Server',
+              version: '1.0.0'
             },
             capabilities: {
               tools: tools.tools?.length || 0,

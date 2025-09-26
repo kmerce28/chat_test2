@@ -386,13 +386,13 @@ class MCPClientManager {
       },
       
       // 이벤트 리스너 (MCP SDK 호환)
-      on: (event: string, callback: (data: unknown) => void) => {
+      on: (event: string, _callback: (data: unknown) => void) => {
         console.log('StreamableHTTP Transport 이벤트 리스너 등록:', event)
         // HTTP Transport는 폴링 방식으로 구현
         return this
       },
       
-      off: (event: string, callback: (data: unknown) => void) => {
+      off: (event: string, _callback: (data: unknown) => void) => {
         console.log('StreamableHTTP Transport 이벤트 리스너 제거:', event)
         return this
       }
