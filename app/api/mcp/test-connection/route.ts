@@ -32,10 +32,10 @@ export async function POST(request: NextRequest) {
 
     // 연결 테스트 수행
     const testResults = {
-      serverInfo: null as any,
-      tools: null as any,
-      prompts: null as any,
-      resources: null as any,
+      serverInfo: null as Record<string, unknown> | null,
+      tools: null as Record<string, unknown> | null,
+      prompts: null as Record<string, unknown> | null,
+      resources: null as Record<string, unknown> | null,
       errors: [] as string[]
     }
 

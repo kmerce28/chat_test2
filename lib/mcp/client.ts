@@ -338,7 +338,7 @@ class MCPClientManager {
     await Promise.all(disconnectPromises)
   }
 
-  private createStreamableHTTPTransport(url: string, headers?: Record<string, string>): any {
+  private createStreamableHTTPTransport(url: string, headers?: Record<string, string>): Record<string, unknown> {
     // StreamableHTTP Transport 구현 - MCP SDK Transport 인터페이스 준수
     console.log('StreamableHTTP Transport 생성:', { url, headers })
     
@@ -358,7 +358,7 @@ class MCPClientManager {
       },
       
       // MCP 프로토콜 메시지 전송
-      send: async (message: any) => {
+      send: async (message: Record<string, unknown>) => {
         console.log('StreamableHTTP Transport 메시지 전송:', message)
         
         try {
@@ -386,13 +386,13 @@ class MCPClientManager {
       },
       
       // 이벤트 리스너 (MCP SDK 호환)
-      on: (event: string, callback: Function) => {
+      on: (event: string, callback: (data: unknown) => void) => {
         console.log('StreamableHTTP Transport 이벤트 리스너 등록:', event)
         // HTTP Transport는 폴링 방식으로 구현
         return this
       },
       
-      off: (event: string, callback: Function) => {
+      off: (event: string, callback: (data: unknown) => void) => {
         console.log('StreamableHTTP Transport 이벤트 리스너 제거:', event)
         return this
       }

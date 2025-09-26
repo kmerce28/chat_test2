@@ -32,7 +32,7 @@ export default function MCPPage() {
   const [isTestModalOpen, setIsTestModalOpen] = useState(false)
   const [editingServer, setEditingServer] = useState<MCPServer | undefined>()
   const [testingServer, setTestingServer] = useState<{ id: string; name: string } | undefined>()
-  const [isTestingConnection, setIsTestingConnection] = useState(false)
+  // const [isTestingConnection, setIsTestingConnection] = useState(false)
 
   // 연결 상태 새로고침
   useEffect(() => {
@@ -132,7 +132,7 @@ export default function MCPPage() {
 
   // 연결 테스트
   const handleTestConnection = async (serverId: string) => {
-    setIsTestingConnection(true)
+    // setIsTestingConnection(true)
     try {
       const response = await fetch('/api/mcp/test-connection', {
         method: 'POST',
@@ -157,7 +157,7 @@ export default function MCPPage() {
       console.error('연결 테스트 실패:', error)
       alert('연결 테스트 중 오류가 발생했습니다: ' + (error instanceof Error ? error.message : '알 수 없는 오류'))
     } finally {
-      setIsTestingConnection(false)
+      // setIsTestingConnection(false)
     }
   }
 
