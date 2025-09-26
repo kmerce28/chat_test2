@@ -1,12 +1,14 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
+import type { Transport, TransportSendOptions } from '@modelcontextprotocol/sdk/shared/transport.js'
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import type { MCPServer } from '@/lib/types/mcp'
 
 export interface MCPConnection {
   id: string
   client: Client
-  transport: StdioClientTransport | SSEClientTransport
+  transport: Transport
   status: 'connected' | 'disconnected' | 'error'
   lastConnected?: Date
   error?: string
@@ -44,7 +46,7 @@ class MCPClientManager {
     }
 
     try {
-      let transport: StdioClientTransport | SSEClientTransport | Record<string, unknown>
+      let transport: Transport
 
       switch (server.transport) {
         case 'stdio':
@@ -139,20 +141,12 @@ class MCPClientManager {
       try {
         console.log('MCP 서버 초기화 확인 중...')
         
-        // 서버 정보 요청으로 연결 상태 확인 (타임아웃 5초)
-        const serverInfoPromise = client.getServerInfo()
-        const serverInfoTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Server info timeout')), 5000)
-        )
-        const serverInfo = await Promise.race([serverInfoPromise, serverInfoTimeout])
-        console.log('MCP 서버 정보:', serverInfo)
-        
-        // 사용 가능한 도구 목록 요청 (타임아웃 5초)
+        // 사용 가능한 도구 목록 요청으로 연결 상태 확인 (타임아웃 5초)
         const toolsPromise = client.listTools()
         const toolsTimeout = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Tools list timeout')), 5000)
         )
-        const tools = await Promise.race([toolsPromise, toolsTimeout])
+        const tools = await Promise.race([toolsPromise, toolsTimeout]) as { tools?: unknown[] }
         console.log('사용 가능한 도구 수:', tools.tools?.length || 0)
         
         console.log('MCP 서버 초기화 완료')
@@ -196,7 +190,7 @@ class MCPClientManager {
       const connection: MCPConnection = {
         id: connectionId,
         client: null as unknown as Client,
-        transport: null as unknown as StdioClientTransport | SSEClientTransport,
+        transport: null as unknown as Transport,
         status: 'error',
         error: error instanceof Error ? error.message : 'Unknown error'
       }
@@ -240,7 +234,7 @@ class MCPClientManager {
     }
 
     try {
-      const result = await connection.client.listTools()
+      const result = await connection.client.listTools() as { tools?: unknown[] }
       return result.tools || []
     } catch (error) {
       console.error('Error getting server tools:', error)
@@ -338,65 +332,74 @@ class MCPClientManager {
     await Promise.all(disconnectPromises)
   }
 
-  private createStreamableHTTPTransport(url: string, headers?: Record<string, string>): Record<string, unknown> {
+  private createStreamableHTTPTransport(url: string, headers?: Record<string, string>): Transport {
     // StreamableHTTP Transport 구현 - MCP SDK Transport 인터페이스 준수
     console.log('StreamableHTTP Transport 생성:', { url, headers })
     
-    return {
-      url,
-      headers: headers || {},
+    class StreamableHTTPTransport implements Transport {
+      private _url: string
+      private _headers: Record<string, string>
       
-      // MCP SDK Transport 인터페이스 구현
-      connect: async () => {
-        console.log('StreamableHTTP Transport 연결 시작:', url)
+      // Transport interface 콜백들
+      onclose?: (() => void) | undefined
+      onerror?: ((error: Error) => void) | undefined
+      onmessage?: ((message: JSONRPCMessage) => void) | undefined
+      sessionId?: string | undefined
+      setProtocolVersion?: ((version: string) => void) | undefined
+      
+      constructor(url: string, headers: Record<string, string> = {}) {
+        this._url = url
+        this._headers = headers
+      }
+      
+      async start(): Promise<void> {
+        console.log('StreamableHTTP Transport 연결 시작:', this._url)
         return Promise.resolve()
-      },
+      }
       
-      close: async () => {
+      async close(): Promise<void> {
         console.log('StreamableHTTP Transport 연결 종료')
+        this.onclose?.()
         return Promise.resolve()
-      },
+      }
       
-      // MCP 프로토콜 메시지 전송
-      send: async (message: Record<string, unknown>) => {
+      async send(message: JSONRPCMessage, _options?: TransportSendOptions): Promise<void> {
         console.log('StreamableHTTP Transport 메시지 전송:', message)
         
         try {
-          const response = await fetch(url, {
+          const response = await fetch(this._url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
-              ...headers
+              ...this._headers
             },
             body: JSON.stringify(message)
           })
           
           if (!response.ok) {
-            throw new Error(`StreamableHTTP ${response.status}: ${response.statusText}`)
+            const error = new Error(`StreamableHTTP ${response.status}: ${response.statusText}`)
+            this.onerror?.(error)
+            throw error
           }
           
           const data = await response.json()
           console.log('StreamableHTTP Transport 응답:', data)
-          return data
+          
+          // 응답이 있는 경우 onmessage 콜백 호출
+          if (data && this.onmessage) {
+            this.onmessage(data as JSONRPCMessage)
+          }
         } catch (error) {
           console.error('StreamableHTTP Transport 전송 실패:', error)
-          throw error
+          const err = error instanceof Error ? error : new Error('Unknown error')
+          this.onerror?.(err)
+          throw err
         }
-      },
-      
-      // 이벤트 리스너 (MCP SDK 호환)
-      on: (event: string) => {
-        console.log('StreamableHTTP Transport 이벤트 리스너 등록:', event)
-        // HTTP Transport는 폴링 방식으로 구현
-        return this
-      },
-      
-      off: (event: string) => {
-        console.log('StreamableHTTP Transport 이벤트 리스너 제거:', event)
-        return this
       }
     }
+    
+    return new StreamableHTTPTransport(url, headers || {})
   }
 
   private startConnectionMonitoring(connectionId: string): void {
@@ -412,8 +415,8 @@ class MCPClientManager {
       }
 
       try {
-        // 간단한 핑 테스트
-        await currentConnection.client.getServerInfo()
+        // 간단한 핑 테스트 - tools list 요청으로 연결 상태 확인
+        await currentConnection.client.listTools()
         console.log(`MCP 서버 ${connectionId} 연결 상태 정상`)
       } catch (error) {
         console.error(`MCP 서버 ${connectionId} 연결 상태 확인 실패:`, error)
