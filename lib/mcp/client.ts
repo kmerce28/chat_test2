@@ -44,7 +44,7 @@ class MCPClientManager {
     }
 
     try {
-      let transport: any
+      let transport: StdioClientTransport | SSEClientTransport | Record<string, unknown>
 
       switch (server.transport) {
         case 'stdio':
@@ -338,7 +338,7 @@ class MCPClientManager {
     await Promise.all(disconnectPromises)
   }
 
-  private createStreamableHTTPTransport(url: string, headers?: Record<string, string>): any {
+  private createStreamableHTTPTransport(url: string, headers?: Record<string, string>): Record<string, unknown> {
     // StreamableHTTP Transport 구현 - MCP SDK Transport 인터페이스 준수
     console.log('StreamableHTTP Transport 생성:', { url, headers })
     
